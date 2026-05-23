@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CrowdIQ</string>
+    <string name="title_activity_main">CrowdIQ</string>
+    <string name="package_name">ai.crowdiq.platform</string>
+    <string name="custom_url_scheme">ai.crowdiq.platform</string>
+</resources>
