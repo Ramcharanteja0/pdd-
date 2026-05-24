@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { AlertTriangle, CheckCircle, Bell, Clock } from 'lucide-react';
 import Topbar from '../components/Topbar';
 import { fetchAlerts, resolveAlert } from '../lib/supabaseService';
-import { ALERTS as MOCK_ALERTS } from '../data/mockData';
 
 const TYPE_LABEL = { danger: 'Critical', warning: 'Warning', info: 'Info', success: 'Resolved', critical: 'Critical' };
 const borderColor = (type) => ({ danger: '#EF4444', warning: '#F59E0B', critical: '#EF4444', info: '#3B82F6', success: '#10B981' }[type] || '#94A3B8');
@@ -11,7 +10,6 @@ export default function Alerts({ sidebarOpen, setSidebarOpen }) {
   const [filter, setFilter] = useState('all');
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [usingMock, setUsingMock] = useState(false);
 
   useEffect(() => { loadAlerts(); }, []);
 
@@ -19,27 +17,15 @@ export default function Alerts({ sidebarOpen, setSidebarOpen }) {
     try {
       setLoading(true);
       const data = await fetchAlerts();
-      if (data.length === 0) {
-        // Fallback to mock data if DB is empty
-        setAlerts(MOCK_ALERTS);
-        setUsingMock(true);
-      } else {
-        setAlerts(data);
-        setUsingMock(false);
-      }
-    } catch {
-      setAlerts(MOCK_ALERTS);
-      setUsingMock(true);
+      setAlerts(data);
+    } catch (err) {
+      console.error('Failed to load alerts from Supabase:', err);
     } finally {
       setLoading(false);
     }
   }
 
   async function handleResolve(id) {
-    if (usingMock) {
-      setAlerts(prev => prev.map(a => a.id === id ? { ...a, resolved: true, type: 'success' } : a));
-      return;
-    }
     try {
       const updated = await resolveAlert(id);
       setAlerts(prev => prev.map(a => a.id === id ? updated : a));
@@ -47,6 +33,7 @@ export default function Alerts({ sidebarOpen, setSidebarOpen }) {
       console.error('Resolve failed:', err);
     }
   }
+
 
   const filtered = filter === 'all' ? alerts
     : filter === 'active'  ? alerts.filter(a => !a.resolved)
@@ -64,12 +51,6 @@ export default function Alerts({ sidebarOpen, setSidebarOpen }) {
       <Topbar title="Alerts & Incidents" subtitle="Real-time operational warnings"
         onToggleSidebar={() => setSidebarOpen(o => !o)} sidebarOpen={sidebarOpen} />
       <div className="page-body">
-
-        {usingMock && (
-          <div style={{ padding: '8px 16px', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 8, marginBottom: 16, fontSize: '0.78rem', color: '#92400E', fontWeight: 600 }}>
-            🟡 Showing simulated data — Run <code>supabase_schema.sql</code> in your Supabase SQL editor to enable live DB alerts
-          </div>
-        )}
 
         {/* Summary Cards */}
         <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 24 }}>

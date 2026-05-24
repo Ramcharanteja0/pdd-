@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Bell, RefreshCw, Menu, X, Settings, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { ALERTS } from '../data/mockData';
+import { fetchAlerts, resolveAlert as dbResolveAlert } from '../lib/supabaseService';
+import { supabase } from '../lib/supabase';
 
 export default function Topbar({ title, subtitle, onRefresh, onToggleSidebar, sidebarOpen }) {
   const { user, logout } = useAuth();
@@ -10,13 +11,44 @@ export default function Topbar({ title, subtitle, onRefresh, onToggleSidebar, si
   const [time, setTime] = useState(new Date());
   const [spinning, setSpinning] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [alerts, setAlerts] = useState(ALERTS);
+  
+  // Dynamic live alerts state
+  const [alerts, setAlerts] = useState([]);
   const notifRef = useRef(null);
+
+  const loadAlerts = useCallback(async () => {
+    try {
+      const data = await fetchAlerts();
+      setAlerts(data);
+    } catch (err) {
+      console.error('Topbar alerts failed:', err);
+    }
+  }, []);
 
   useEffect(() => {
     const id = setInterval(() => setTime(new Date()), 30000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    loadAlerts();
+
+    // ── Supabase Realtime Alerts Channel ────────────────────────
+    const alertsChannel = supabase
+      .channel('topbar-alerts')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'alerts' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setAlerts(prev => [payload.new, ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          setAlerts(prev => prev.map(a => a.id === payload.new.id ? payload.new : a));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(alertsChannel);
+    };
+  }, [loadAlerts]);
 
   // Close notification dropdown when clicking outside
   useEffect(() => {
@@ -32,11 +64,19 @@ export default function Topbar({ title, subtitle, onRefresh, onToggleSidebar, si
   const handleRefresh = () => {
     setSpinning(true);
     if (onRefresh) onRefresh();
+    loadAlerts();
     setTimeout(() => setSpinning(false), 900);
   };
 
-  const resolveAlert = (id) => {
-    setAlerts(prev => prev.map(a => a.id === id ? { ...a, resolved: true, type: 'success' } : a));
+  const resolveAlert = async (id) => {
+    try {
+      const updated = await dbResolveAlert(id);
+      setAlerts(prev => prev.map(a => a.id === id ? updated : a));
+    } catch (err) {
+      console.error('Failed to resolve alert from topbar:', err);
+      // Fallback local resolve
+      setAlerts(prev => prev.map(a => a.id === id ? { ...a, resolved: true, type: 'success' } : a));
+    }
   };
 
   const unread = alerts.filter(a => !a.resolved).length;
@@ -104,7 +144,10 @@ export default function Topbar({ title, subtitle, onRefresh, onToggleSidebar, si
                 </div>
                 <button
                   style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', border: 'none', padding: '4px 10px', borderRadius: 99, cursor: 'pointer' }}
-                  onClick={() => setAlerts(prev => prev.map(a => ({ ...a, resolved: true, type: 'success' })))}
+                  onClick={async () => {
+                    const unreadAlerts = alerts.filter(a => !a.resolved);
+                    await Promise.all(unreadAlerts.map(a => resolveAlert(a.id)));
+                  }}
                 >
                   Mark all read
                 </button>
@@ -119,7 +162,7 @@ export default function Topbar({ title, subtitle, onRefresh, onToggleSidebar, si
                 ) : (
                   alerts.map(alert => (
                     <div key={alert.id} style={{ display: 'flex', gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--border-light)', background: alert.resolved ? 'white' : '#FAFBFF', transition: 'background 0.2s' }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: alert.type === 'danger' ? '#FEE2E2' : alert.type === 'warning' ? '#FEF3C7' : alert.type === 'success' ? '#D1FAE5' : '#DBEAFE', color: alert.type === 'danger' ? '#EF4444' : alert.type === 'warning' ? '#F59E0B' : alert.type === 'success' ? '#10B981' : '#3B82F6' }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: alert.type === 'danger' || alert.type === 'critical' ? '#FEE2E2' : alert.type === 'warning' ? '#FEF3C7' : alert.type === 'success' ? '#D1FAE5' : '#DBEAFE', color: alert.type === 'danger' || alert.type === 'critical' ? '#EF4444' : alert.type === 'warning' ? '#F59E0B' : alert.type === 'success' ? '#10B981' : '#3B82F6' }}>
                         {alert.resolved ? <CheckCircle size={14} /> : <AlertTriangle size={14} />}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -130,7 +173,9 @@ export default function Topbar({ title, subtitle, onRefresh, onToggleSidebar, si
                           )}
                         </div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 2 }}>{alert.zone}</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 1 }}>{alert.time}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 1 }}>
+                          {new Date(alert.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
                       </div>
                     </div>
                   ))

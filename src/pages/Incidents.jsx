@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
 import Topbar from '../components/Topbar';
-import { ZONES } from '../data/mockData';
-import { fetchIncidents, createIncident, resolveIncident } from '../lib/supabaseService';
+import { fetchIncidents, createIncident, resolveIncident, fetchZones } from '../lib/supabaseService';
 
 const TYPE_COLORS = {
   Medical:   { bg: '#FEE2E2', color: '#991B1B', icon: '🚑' },
@@ -13,6 +12,7 @@ const TYPE_COLORS = {
 
 export default function Incidents({ sidebarOpen, setSidebarOpen }) {
   const [incidents, setIncidents] = useState([]);
+  const [zones, setZones] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
   const [form, setForm]           = useState({ zone: '', type: 'Crowd', desc: '', reporter: '' });
@@ -21,6 +21,7 @@ export default function Incidents({ sidebarOpen, setSidebarOpen }) {
 
   useEffect(() => {
     loadIncidents();
+    loadZones();
   }, []);
 
   async function loadIncidents() {
@@ -33,6 +34,15 @@ export default function Incidents({ sidebarOpen, setSidebarOpen }) {
       setError('Could not load incidents. Check database connection.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadZones() {
+    try {
+      const data = await fetchZones();
+      setZones(data);
+    } catch (err) {
+      console.error('Failed to load zones:', err);
     }
   }
 
@@ -104,7 +114,7 @@ export default function Incidents({ sidebarOpen, setSidebarOpen }) {
                   <label className="form-label">Zone / Location</label>
                   <select className="form-input form-select" value={form.zone} onChange={e => setForm(f => ({...f, zone: e.target.value}))}>
                     <option value="">— Select a zone —</option>
-                    {ZONES.map(z => <option key={z.id} value={z.name}>{z.name}</option>)}
+                    {zones.map(z => <option key={z.id} value={z.name}>{z.name}</option>)}
                   </select>
                 </div>
                 <div className="form-group">

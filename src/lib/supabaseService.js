@@ -87,3 +87,65 @@ export async function fetchDispatchLog() {
   if (error) throw error;
   return data;
 }
+
+// ── ZONES ──────────────────────────────────────────────────
+export async function fetchZones() {
+  const { data, error } = await supabase
+    .from('zones')
+    .select('*')
+    .order('id');
+  if (error) throw error;
+  return data;
+}
+
+export async function updateZoneDensity(id, density) {
+  const { data, error } = await supabase
+    .from('zones')
+    .update({ density })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// ── VENDORS ────────────────────────────────────────────────
+export async function fetchVendors() {
+  const { data, error } = await supabase
+    .from('vendors')
+    .select('*')
+    .order('id');
+  if (error) throw error;
+  return data;
+}
+
+// ── PREDICTIONS ────────────────────────────────────────────
+export async function fetchPredictions() {
+  const { data, error } = await supabase
+    .from('predictions')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+// ── AUTOMATED ACTIONS ──────────────────────────────────────
+export async function fetchAutomatedActions() {
+  const { data, error } = await supabase
+    .from('automated_actions')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function logAutomatedAction({ zone, title, description, triggered_by = 'system' }) {
+  const { data, error } = await supabase
+    .from('automated_actions')
+    .insert([{ zone, title, description, triggered_by }])
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
