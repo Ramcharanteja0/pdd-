@@ -25,6 +25,8 @@ export default function Register() {
     setStep(2);
   };
 
+  const [success, setSuccess] = useState(false);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -32,10 +34,20 @@ export default function Register() {
     if (!form.role) { setError('Please select your role.'); return; }
     setLoading(true);
     try {
-      await register(form);
-      navigate('/dashboard');
+      const user = await register(form);
+      if (user) {
+        navigate('/dashboard');
+      } else {
+        // User created but email confirmation required
+        setSuccess(true);
+      }
     } catch (err) {
-      setError(err.message);
+      const msg = err.message?.toLowerCase() || '';
+      if (msg.includes('already registered') || msg.includes('already been registered')) {
+        setError('This email is already registered. Try signing in instead.');
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -105,7 +117,18 @@ export default function Register() {
 
           {error && <div className="auth-error">⚠️ {error}</div>}
 
-          {step === 1 ? (
+          {success ? (
+            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <div style={{ fontSize: '3rem', marginBottom: 16 }}>✅</div>
+              <h2 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: 8 }}>Account Created!</h2>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: 20, lineHeight: 1.6 }}>
+                Your account has been created. If email confirmation is enabled, please check your inbox and confirm your email before signing in.
+              </p>
+              <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '12px' }} onClick={() => navigate('/login')}>
+                Go to Sign In
+              </button>
+            </div>
+          ) : step === 1 ? (
             <div>
               <div className="form-group">
                 <label className="form-label">Full Name</label>

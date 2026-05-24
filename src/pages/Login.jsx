@@ -20,7 +20,14 @@ export default function Login() {
       await login(form);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.message);
+      const msg = err.message?.toLowerCase() || '';
+      if (msg.includes('email not confirmed')) {
+        setError('Email not confirmed. Go to your Supabase Dashboard → Authentication → Users → find this email → click the 3 dots → Confirm User. Or delete the user and register again.');
+      } else if (msg.includes('invalid login')) {
+        setError('Invalid email or password. Please check and try again.');
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -28,17 +35,26 @@ export default function Login() {
 
   const demoLogin = async () => {
     setLoading(true);
+    setError('');
     try {
-      // Seed demo account if not exists, then log in
-      const existing = JSON.parse(localStorage.getItem('crowdiq_users') || '[]');
-      if (!existing.find(u => u.email === 'demo@crowdiq.ai')) {
-        existing.push({ id: 1, name: 'Demo Organizer', email: 'demo@crowdiq.ai', password: 'demo1234', org: 'CrowdIQ Demo', role: 'Event Organizer' });
-        localStorage.setItem('crowdiq_users', JSON.stringify(existing));
-      }
+      // Attempt to create the demo account (ignored if it already exists)
+      const { supabase } = await import('../lib/supabase');
+      await supabase.auth.signUp({
+        email: 'demo@crowdiq.ai',
+        password: 'demo1234',
+        options: { data: { name: 'Demo Organizer', org: 'CrowdIQ Demo', role: 'Event Organizer' } }
+      });
+      
+      // Now log in with the demo account
       await login({ email: 'demo@crowdiq.ai', password: 'demo1234' });
       navigate('/dashboard');
     } catch (err) {
-      setError(err.message);
+      const msg = err.message?.toLowerCase() || '';
+      if (msg.includes('email not confirmed')) {
+        setError('Demo account needs email confirmation disabled in Supabase. Go to Authentication → Providers → Email → disable "Confirm email" → Save.');
+      } else {
+        setError('Demo login failed: ' + err.message);
+      }
     } finally {
       setLoading(false);
     }
