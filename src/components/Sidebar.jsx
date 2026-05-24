@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Map, Users, Bell, ShoppingBag,
-  BarChart3, AlertTriangle, Zap, ChevronRight, LogOut, Settings, X
+  BarChart3, AlertTriangle, Zap, ChevronRight, LogOut, Settings, X, Radio
 } from 'lucide-react';
 import { EVENT_INFO } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
@@ -12,6 +12,9 @@ const NAV = [
     { path: '/heatmap',     label: 'Live Heatmap', icon: Map,             badge: null },
     { path: '/alerts',      label: 'Alerts',       icon: Bell,            badge: 4    },
     { path: '/staff',       label: 'Staff',        icon: Users,           badge: null },
+  ]},
+  { section: 'Tracking', items: [
+    { path: '/tracking',    label: 'Live GPS Tracking', icon: Radio,       badge: null },
   ]},
   { section: 'Intelligence', items: [
     { path: '/predictions', label: 'AI Predictions', icon: Zap,           badge: null },

@@ -131,6 +131,7 @@ create table if not exists public.zones (
   capacity    integer not null,
   lat         double precision not null,
   lng         double precision not null,
+  radius_meters integer default 50,
   density     integer default 50,
   created_at  timestamptz default now()
 );
@@ -198,6 +199,60 @@ create policy "Authenticated users can read automated actions"
 create policy "Authenticated users can insert automated actions"
   on public.automated_actions for insert with check (auth.role() = 'authenticated');
 
+-- 10. ATTENDEE LOCATIONS (Real-time GPS tracking)
+create table if not exists public.attendee_locations (
+  id          uuid primary key default gen_random_uuid(),
+  device_id   text not null,
+  latitude    double precision not null,
+  longitude   double precision not null,
+  accuracy    double precision,
+  zone_id     text,
+  zone_name   text,
+  event_id    text default 'current',
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
+);
+
+alter table public.attendee_locations enable row level security;
+
+-- Allow ANYONE to insert (attendees are not authenticated)
+create policy "Anyone can insert attendee locations"
+  on public.attendee_locations for insert with check (true);
+
+-- Allow ANYONE to read (for counting)
+create policy "Anyone can read attendee locations"
+  on public.attendee_locations for select using (true);
+
+-- Allow ANYONE to update their own location
+create policy "Anyone can update attendee locations"
+  on public.attendee_locations for update using (true);
+
+-- Allow ANYONE to delete their own location (check-out)
+create policy "Anyone can delete attendee locations"
+  on public.attendee_locations for delete using (true);
+
+-- Also allow public read on zones (attendees need zone coordinates)
+create policy "Anyone can read zones"
+  on public.zones for select using (true);
+
+-- 11. GATE SCANS (Entry/Exit counting)
+create table if not exists public.gate_scans (
+  id          uuid primary key default gen_random_uuid(),
+  gate_name   text not null,
+  scan_type   text not null default 'entry',
+  ticket_id   text,
+  scanned_by  uuid references auth.users(id),
+  created_at  timestamptz default now()
+);
+
+alter table public.gate_scans enable row level security;
+
+create policy "Authenticated users can read gate scans"
+  on public.gate_scans for select using (auth.role() = 'authenticated');
+
+create policy "Authenticated users can insert gate scans"
+  on public.gate_scans for insert with check (auth.role() = 'authenticated');
+
 -- ============================================================
 -- Seed Data – Populating all initial metrics and entries
 -- ============================================================
@@ -224,20 +279,20 @@ insert into public.staff (id, name, role, zone, status, phone, avatar) values
 on conflict (id) do nothing;
 
 -- Zones Seed
-insert into public.zones (id, name, capacity, lat, lng, density) values
-  ('Z1', 'Main Stage', 2000, 19.0765, 72.8773, 94),
-  ('Z2', 'North Entrance', 800, 19.0780, 72.8768, 68),
-  ('Z3', 'Food Court A', 600, 19.0758, 72.8780, 89),
-  ('Z4', 'Tech Expo Hall', 1200, 19.0760, 72.8760, 62),
-  ('Z5', 'Workshop Zone', 400, 19.0748, 72.8775, 28),
-  ('Z6', 'South Exit', 600, 19.0750, 72.8763, 18),
-  ('Z7', 'VIP Lounge', 300, 19.0770, 72.8785, 35),
-  ('Z8', 'Parking A', 500, 19.0785, 72.8780, 22),
-  ('Z9', 'First Aid', 100, 19.0755, 72.8770, 12),
-  ('Z10', 'Media Centre', 200, 19.0762, 72.8790, 55),
-  ('Z11', 'Food Court B', 600, 19.0742, 72.8768, 64),
-  ('Z12', 'Emergency Gate', 400, 19.0775, 72.8758, 15)
-on conflict (id) do update set density = excluded.density;
+insert into public.zones (id, name, capacity, lat, lng, radius_meters, density) values
+  ('Z1', 'Main Stage', 2000, 19.0765, 72.8773, 80, 0),
+  ('Z2', 'North Entrance', 800, 19.0780, 72.8768, 40, 0),
+  ('Z3', 'Food Court A', 600, 19.0758, 72.8780, 50, 0),
+  ('Z4', 'Tech Expo Hall', 1200, 19.0760, 72.8760, 70, 0),
+  ('Z5', 'Workshop Zone', 400, 19.0748, 72.8775, 35, 0),
+  ('Z6', 'South Exit', 600, 19.0750, 72.8763, 40, 0),
+  ('Z7', 'VIP Lounge', 300, 19.0770, 72.8785, 30, 0),
+  ('Z8', 'Parking A', 500, 19.0785, 72.8780, 60, 0),
+  ('Z9', 'First Aid', 100, 19.0755, 72.8770, 20, 0),
+  ('Z10', 'Media Centre', 200, 19.0762, 72.8790, 25, 0),
+  ('Z11', 'Food Court B', 600, 19.0742, 72.8768, 50, 0),
+  ('Z12', 'Emergency Gate', 400, 19.0775, 72.8758, 35, 0)
+on conflict (id) do update set density = excluded.density, radius_meters = excluded.radius_meters;
 
 -- Vendors Seed
 insert into public.vendors (id, name, zone, visits, revenue, wait_time, rating, status) values

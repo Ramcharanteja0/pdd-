@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -38,7 +39,6 @@ export default function Login() {
     setError('');
     try {
       // Attempt to create the demo account (ignored if it already exists)
-      const { supabase } = await import('../lib/supabase');
       await supabase.auth.signUp({
         email: 'demo@crowdiq.ai',
         password: 'demo1234',

@@ -149,3 +149,112 @@ export async function logAutomatedAction({ zone, title, description, triggered_b
   return data;
 }
 
+// ── ATTENDEE TRACKING (Real GPS) ──────────────────────────
+export async function upsertAttendeeLocation({ deviceId, latitude, longitude, accuracy, zoneId, zoneName }) {
+  const { data: existing } = await supabase
+    .from('attendee_locations')
+    .select('id')
+    .eq('device_id', deviceId)
+    .eq('event_id', 'current')
+    .maybeSingle();
+
+  if (existing) {
+    const { data, error } = await supabase
+      .from('attendee_locations')
+      .update({
+        latitude, longitude, accuracy,
+        zone_id: zoneId, zone_name: zoneName,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', existing.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } else {
+    const { data, error } = await supabase
+      .from('attendee_locations')
+      .insert([{
+        device_id: deviceId, latitude, longitude, accuracy,
+        zone_id: zoneId, zone_name: zoneName, event_id: 'current'
+      }])
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+}
+
+export async function fetchAttendeeLocations() {
+  const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('attendee_locations')
+    .select('*')
+    .gte('updated_at', tenMinAgo)
+    .eq('event_id', 'current');
+  if (error) throw error;
+  return data;
+}
+
+export async function countAttendeesByZone() {
+  const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('attendee_locations')
+    .select('zone_id, zone_name')
+    .gte('updated_at', tenMinAgo)
+    .eq('event_id', 'current');
+  if (error) throw error;
+
+  const counts = {};
+  (data || []).forEach(row => {
+    const key = row.zone_id || 'unknown';
+    if (!counts[key]) counts[key] = { zone_id: row.zone_id, zone_name: row.zone_name, count: 0 };
+    counts[key].count++;
+  });
+  return Object.values(counts);
+}
+
+export async function removeAttendeeLocation(deviceId) {
+  const { error } = await supabase
+    .from('attendee_locations')
+    .delete()
+    .eq('device_id', deviceId)
+    .eq('event_id', 'current');
+  if (error) throw error;
+}
+
+// ── GATE SCANS ────────────────────────────────────────────
+export async function createGateScan({ gateName, scanType, ticketId }) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('gate_scans')
+    .insert([{ gate_name: gateName, scan_type: scanType, ticket_id: ticketId, scanned_by: user?.id }])
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchGateScans() {
+  const { data, error } = await supabase
+    .from('gate_scans')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return data;
+}
+
+export async function getGateScanCounts() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const { data, error } = await supabase
+    .from('gate_scans')
+    .select('scan_type, gate_name')
+    .gte('created_at', today.toISOString());
+  if (error) throw error;
+
+  const entries = (data || []).filter(s => s.scan_type === 'entry').length;
+  const exits = (data || []).filter(s => s.scan_type === 'exit').length;
+  return { entries, exits, inside: entries - exits };
+}

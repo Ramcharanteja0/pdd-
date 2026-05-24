@@ -15,6 +15,8 @@ import Vendors from './pages/Vendors';
 import Incidents from './pages/Incidents';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
+import Tracking from './pages/Tracking';
+import AttendeeCheckin from './pages/AttendeeCheckin';
 
 function ProtectedRoute({ children }) {
   const { isAuth } = useAuth();
@@ -50,6 +52,7 @@ function AppShell() {
           <Route path="/incidents"   element={<Incidents   sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />} />
           <Route path="/analytics"   element={<Analytics   sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />} />
           <Route path="/settings"    element={<Settings    sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />} />
+          <Route path="/tracking"    element={<Tracking    sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />} />
           <Route path="*"            element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </div>
@@ -64,6 +67,7 @@ function AppRoutes() {
       <Route path="/"         element={<PublicRoute><Onboarding /></PublicRoute>} />
       <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+      <Route path="/checkin"  element={<AttendeeCheckin />} />
       <Route path="/*"        element={<ProtectedRoute><AppShell /></ProtectedRoute>} />
     </Routes>
   );
